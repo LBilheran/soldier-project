@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-let camera, scene, renderer, mesh, mesh2, controls;
+let camera, scene, renderer, object, mesh, mesh2, controls, mixer;
 const dummy = new THREE.Object3D();
 const min = 8;
 const max = 32;
@@ -22,15 +23,35 @@ init();
 createUI();
 
 function init() {
-    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(amount * 0.9, amount * 0.9, amount * 0.9);
-    camera.lookAt(0, 0, 0);
 
+    // Scène
     scene = new THREE.Scene();
     scene.background = new THREE.Color( 0x99DDFF );
 
     scene.fog = new THREE.Fog( 0x99DDFF, 5000, 10000 );
 
+    // Camera
+    camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(amount * 0.9, amount * 0.9, amount * 0.9);
+    camera.lookAt(0, 0, 0);
+
+    // Renderer
+    renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setAnimationLoop(animate);
+    document.body.appendChild(renderer.domElement);
+    renderer.shadowMap.enabled = true;
+
+    // Controls
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.screenSpacePanning = true;
+    controls.minDistance = 5;
+    controls.maxDistance = 40;
+    controls.target.set(0, 2, 0);
+    controls.update();
+
+    // Lumières
     const hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 2 );
     hemiLight.color.setHSL( 0.6, 1, 0.6 );
     hemiLight.groundColor.setHSL( 0.095, 1, 0.75 );
@@ -74,38 +95,129 @@ function init() {
     scene.add( ground );
 
     Promise.all([
-        loadGeometry('suzanne_buffergeometry.json', 0x2194ce, count),
+        loadGLTF('Michelle.glb', 0x2194ce, count),
+        // loadGeometry('suzanne_buffergeometry.json', 0x2194ce, count),
         loadGeometry('suzanne_buffergeometry.json', 0x8d8d8d, count2)
-    ]).then(([loadedMesh, loadedMesh2]) => {
+    ]).then(([{ objectCreate, loadedMesh }, loadedMesh2]) => {
         if (mesh) {
             scene.remove(mesh);
         }
         if (mesh2) {
             scene.remove(mesh2);
         }
+        object = objectCreate;
         mesh = loadedMesh;
         mesh2 = loadedMesh2;
 
-        scene.add(mesh);
+        scene.add(object);
         scene.add(mesh2);
-        start(); // Lancer start seulement quand tout est chargé
+        start();
     });
 
-    renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.setAnimationLoop(animate);
-    document.body.appendChild(renderer.domElement);
-    renderer.shadowMap.enabled = true;
-
-    controls = new OrbitControls(camera, renderer.domElement);
-    controls.screenSpacePanning = true;
-    controls.minDistance = 5;
-    controls.maxDistance = 40;
-    controls.target.set(0, 2, 0);
-    controls.update();
-
     window.addEventListener('resize', onWindowResize);
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function loadGeometry(url, color, counti) {
+    const loader = new THREE.BufferGeometryLoader();
+    return new Promise((resolve) => {
+        loader.load(url, function (geometry) {
+            geometry.computeVertexNormals();
+            geometry.scale(0.5, 0.5, 0.5);
+
+            const material = new THREE.MeshPhongMaterial({ color: color, shininess: 100 });
+            const instancedMesh = new THREE.InstancedMesh(geometry, material, counti);
+            instancedMesh.castShadow = true;
+			instancedMesh.receiveShadow = true;
+            instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+            resolve(instancedMesh);
+        });
+    });
+}
+
+function loadGLTF(url, color, counti) {
+    const loader = new GLTFLoader();
+    return new Promise((resolve) => {
+        loader.load(url, function ( gltf ) {
+            const objectCreate = gltf.scene;
+
+            mixer = new THREE.AnimationMixer( objectCreate );
+            const action = mixer.clipAction( gltf.animations[ 0 ] );
+            action.play();
+
+            let instancedMesh = null;
+            let originalMesh = null;
+            let geometry = null;
+            let material = new THREE.MeshPhongMaterial({ color: color, shininess: 100 });
+
+            objectCreate.traverse( function ( child ) {
+                if ( child.isMesh ) {
+                    if (!originalMesh) {
+                        originalMesh = child;
+                        geometry = child.geometry;
+                    }
+
+                    child.material = material;
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+            instancedMesh = new THREE.InstancedMesh(geometry, material, counti);
+            resolve({objectCreate, instancedMesh});
+        });
+    });
+}
+
+function start() {
+    if (mesh) {
+        let i = 0;
+        const offset = (amount - 1) / 2;
+        object.rotation.y = Math.PI;
+
+        object.traverse( ( child ) => {
+            for (let x = 0; x < amount; x++) {
+                for (let y = 0; y < amount; y++) {
+                    dummy.position.set(offset - x, 0, offset - y);
+                    dummy.updateMatrix();
+                    dummy.matrix.toArray( child.instanceMatrix.array, i);
+                    mesh.setMatrixAt(i++, dummy.matrix);
+                }
+            }
+            mesh.instanceMatrix.needsUpdate = true;
+            mesh.computeBoundingSphere();
+            object.add(mesh);
+        });
+    }
+
+    if (mesh2) {
+        let i = 0;
+        const offset = (amount2 - 1) / 2;
+        const maxAmount = Math.max(amount, amount2);
+        separation = maxAmount * 1.5;
+
+        for (let x = 0; x < amount2; x++) {
+            for (let y = 0; y < amount2; y++) {
+                dummy.position.set(offset - x, 0, -(offset - y) - separation);
+                dummy.updateMatrix();
+                mesh2.setMatrixAt(i++, dummy.matrix);
+            }
+        }
+        mesh2.instanceMatrix.needsUpdate = true;
+        mesh2.computeBoundingSphere();
+    }
+
+    if (count > count2) {
+        prepareExplosion(mesh2);
+    } else if (count2 > count) {
+        prepareExplosion(mesh);
+    }
+    
 }
 
 function updateInstances() {
@@ -154,71 +266,6 @@ function createUI() {
     document.body.appendChild(button);
 
     button.addEventListener('click', updateInstances);
-}
-
-function onWindowResize() {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-}
-
-function loadGeometry(url, color, counti) {
-    const loader = new THREE.BufferGeometryLoader();
-    return new Promise((resolve) => {
-        loader.load(url, function (geometry) {
-            geometry.computeVertexNormals();
-            geometry.scale(0.5, 0.5, 0.5);
-
-            const material = new THREE.MeshPhongMaterial({ color: color, shininess: 100 });
-            const instancedMesh = new THREE.InstancedMesh(geometry, material, counti);
-            instancedMesh.castShadow = true;
-			instancedMesh.receiveShadow = true;
-            instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-
-            resolve(instancedMesh);
-        });
-    });
-}
-
-function start() {
-    if (mesh) {
-        let i = 0;
-        const offset = (amount - 1) / 2;
-        mesh.rotation.y = Math.PI;
-        for (let x = 0; x < amount; x++) {
-            for (let y = 0; y < amount; y++) {
-                dummy.position.set(offset - x, 0, offset - y);
-                dummy.updateMatrix();
-                mesh.setMatrixAt(i++, dummy.matrix);
-            }
-        }
-        mesh.instanceMatrix.needsUpdate = true;
-        mesh.computeBoundingSphere();
-    }
-
-    if (mesh2) {
-        let i = 0;
-        const offset = (amount2 - 1) / 2;
-        const maxAmount = Math.max(amount, amount2);
-        separation = maxAmount * 1.5;
-
-        for (let x = 0; x < amount2; x++) {
-            for (let y = 0; y < amount2; y++) {
-                dummy.position.set(offset - x, 0, -(offset - y) - separation);
-                dummy.updateMatrix();
-                mesh2.setMatrixAt(i++, dummy.matrix);
-            }
-        }
-        mesh2.instanceMatrix.needsUpdate = true;
-        mesh2.computeBoundingSphere();
-    }
-
-    if (count > count2) {
-        prepareExplosion(mesh2);
-    } else if (count2 > count) {
-        prepareExplosion(mesh);
-    }
-    
 }
 
 function animate() {
