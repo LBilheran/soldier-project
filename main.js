@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 
 let camera, scene, renderer, object, mesh, mesh2, controls, mixer;
-const dummy = new THREE.Object3D();
 const min = 8;
 const max = 32;
 let amount = Math.floor(Math.random() * (max - 1 + 1) + min);
@@ -58,11 +58,6 @@ function init() {
     hemiLight.position.set( 0, 50, 0 );
     scene.add( hemiLight );
 
-    const hemiLightHelper = new THREE.HemisphereLightHelper( hemiLight, 10 );
-    scene.add( hemiLightHelper );
-
-    //
-
     const dirLight = new THREE.DirectionalLight( 0xffffff, 3 );
     dirLight.color.setHSL( 0.1, 1, 0.95 );
     dirLight.position.set( - 1, 1.75, 1 );
@@ -94,27 +89,36 @@ function init() {
     ground.receiveShadow = true;
     scene.add( ground );
 
-    Promise.all([
-        loadGLTF('Michelle.glb', 0x2194ce, count),
-        // loadGeometry('suzanne_buffergeometry.json', 0x2194ce, count),
-        loadGeometry('suzanne_buffergeometry.json', 0x8d8d8d, count2)
-    ]).then(([{ objectCreate, loadedMesh }, loadedMesh2]) => {
-        if (mesh) {
-            scene.remove(mesh);
-        }
-        if (mesh2) {
-            scene.remove(mesh2);
-        }
-        object = objectCreate;
-        mesh = loadedMesh;
-        mesh2 = loadedMesh2;
+    new RGBELoader()
+        .load('quarry_01_1k.hdr', function ( texture ) {
 
-        scene.add(object);
-        scene.add(mesh2);
-        start();
+            texture.mapping = THREE.EquirectangularReflectionMapping;
+
+            scene.background = texture;
+            scene.environment = texture;
+
+            Promise.all([
+                loadGLTF('Michelle.glb', 0x2194ce, count),
+                // loadGeometry('suzanne_buffergeometry.json', 0x2194ce, count),
+                loadGeometry('suzanne_buffergeometry.json', 0x8d8d8d, count2)
+            ]).then(([{ objectCreate, loadedMesh }, loadedMesh2]) => {
+                if (mesh) {
+                    scene.remove(mesh);
+                }
+                if (mesh2) {
+                    scene.remove(mesh2);
+                }
+                object = objectCreate;
+                mesh = loadedMesh;
+                mesh2 = loadedMesh2;
+
+                scene.add(object);
+                scene.add(mesh2);
+                start();
+            });
+
+            window.addEventListener('resize', onWindowResize);
     });
-
-    window.addEventListener('resize', onWindowResize);
 }
 
 function onWindowResize() {
@@ -156,6 +160,8 @@ function loadGLTF(url, color, counti) {
             let geometry = null;
             let material = new THREE.MeshPhongMaterial({ color: color, shininess: 100 });
 
+            const dummy = new THREE.Object3D();
+
             objectCreate.traverse( function ( child ) {
                 if ( child.isMesh ) {
                     if (!originalMesh) {
@@ -166,6 +172,21 @@ function loadGLTF(url, color, counti) {
                     child.material = material;
                     child.castShadow = true;
                     child.receiveShadow = true;
+
+                    child.isInstancedMesh = true;
+                    child.instanceMatrix = new THREE.InstancedBufferAttribute( new Float32Array( instanceCount * 16 ), 16 );
+                    child.count = instanceCount;
+
+                    for ( let i = 0; i < instanceCount; i ++ ) {
+
+                        dummy.position.x = - 200 + ( ( i % 5 ) * 70 );
+                        dummy.position.y = Math.floor( i / 5 ) * - 200;
+
+                        dummy.updateMatrix();
+
+                        dummy.matrix.toArray( child.instanceMatrix.array, i * 16 );
+
+                    }
                 }
             });
             instancedMesh = new THREE.InstancedMesh(geometry, material, counti);
@@ -175,25 +196,25 @@ function loadGLTF(url, color, counti) {
 }
 
 function start() {
-    if (mesh) {
-        let i = 0;
-        const offset = (amount - 1) / 2;
-        object.rotation.y = Math.PI;
+    // if (mesh) {
+    //     let i = 0;
+    //     const offset = (amount - 1) / 2;
+    //     object.rotation.y = Math.PI;
 
-        object.traverse( ( child ) => {
-            for (let x = 0; x < amount; x++) {
-                for (let y = 0; y < amount; y++) {
-                    dummy.position.set(offset - x, 0, offset - y);
-                    dummy.updateMatrix();
-                    dummy.matrix.toArray( child.instanceMatrix.array, i);
-                    mesh.setMatrixAt(i++, dummy.matrix);
-                }
-            }
-            mesh.instanceMatrix.needsUpdate = true;
-            mesh.computeBoundingSphere();
-            object.add(mesh);
-        });
-    }
+    //     object.traverse( ( child ) => {
+    //         for (let x = 0; x < amount; x++) {
+    //             for (let y = 0; y < amount; y++) {
+    //                 dummy.position.set(offset - x, 0, offset - y);
+    //                 dummy.updateMatrix();
+    //                 dummy.matrix.toArray( child.instanceMatrix.array, i);
+    //                 mesh.setMatrixAt(i++, dummy.matrix);
+    //             }
+    //         }
+    //         mesh.instanceMatrix.needsUpdate = true;
+    //         mesh.computeBoundingSphere();
+    //         object.add(mesh);
+    //     });
+    // }
 
     if (mesh2) {
         let i = 0;
