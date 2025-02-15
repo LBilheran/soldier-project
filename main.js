@@ -3,6 +3,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import GUI from 'lil-gui';
+
+let gui, guiParams;
 
 let camera, scene, renderer, controls;
 
@@ -11,7 +14,7 @@ let mixersR = [];
 let objectM = new THREE.Group();
 let mixersM = [];
 
-let exploseButton, nextButton;
+let exploseButton, nextButton, musicButton;
 
 let nbrR = 1;
 let nbrM = 2;
@@ -30,10 +33,14 @@ const randomDirections = [];
 const url = 'RobotExpressive.glb';
 const urlEnnemy = 'Michelle.glb';
 const audio = new Audio('explode.wav');
+const music = new Audio('music_AoW.mp3');
+music.loop = true;
+
 const clock = new THREE.Clock();
 
 init();
 createUI();
+setupGUI();
 
 function init() {
 
@@ -130,35 +137,6 @@ function onWindowResize() {
 
 function loadEnnemy(url, count) {
 
-    // const loader = new THREE.BufferGeometryLoader();
-    // loader.load(url, function (geometry) {
-    //     geometry.computeVertexNormals();
-    //     geometry.scale(0.5, 0.5, 0.5);
-
-    //     const material = new THREE.MeshPhongMaterial({ color: color, shininess: 100 });
-    //     mesh = new THREE.InstancedMesh(geometry, material, Math.pow(count,2));
-    //     mesh.castShadow = true;
-    //     mesh.receiveShadow = true;
-    //     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-
-    //     scene.add(mesh);
-
-    //     let i = 0;
-    //     const offset = (count - 1) / 2;
-
-    //     const dummy = new THREE.Object3D();
-
-    //     for (let x = 0; x < count; x++) {
-    //         for (let y = 0; y < count; y++) {
-    //             dummy.position.set(offset - x, 1, -(offset - y) - nbrM - 5);
-    //             dummy.updateMatrix();
-    //             mesh.setMatrixAt(i++, dummy.matrix);
-    //         }
-    //     }
-    //     mesh.instanceMatrix.needsUpdate = true;
-    //     mesh.computeBoundingSphere();
-    // });
-
     const loader = new GLTFLoader();
     loader.load(url, function (gltf) {
 
@@ -222,8 +200,11 @@ function loadGLTF(url, count) {
         clone.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
         // Ajouter l'animation pour chaque clone
+        const array = [0, 2, 3, 4, 5, 9, 11, 12, 13];
+        const animation = array[Math.floor(Math.random() * array.length)];
+
         const mixer = new THREE.AnimationMixer(clone);
-        const action = mixer.clipAction(gltf.animations[2]);
+        const action = mixer.clipAction(gltf.animations[animation]);
         action.play();
         mixersR.push(mixer);
 
@@ -233,6 +214,34 @@ function loadGLTF(url, count) {
 
         objectR.add(clone);
     });
+}
+
+function getNextPosition(count, spacing, center) {
+
+    if (count === 1) return center; // Premier clone au centre
+
+    let layer = Math.ceil((Math.sqrt(count) - 1) / 2); // Trouve l'anneau (carré) dans lequel placer le clone
+    let start = (2 * layer - 1) ** 2 + 1; // Première position de cet anneau
+    let index = count - start; // Position relative dans l'anneau
+
+    let side = 2 * layer; // Taille du côté de l'anneau
+    let pos = { x: center.x, y: center.y };
+
+    if (index < side) {
+        pos.x = center.x + (index - layer) * spacing;
+        pos.y = center.y + layer * spacing;
+    } else if (index < 2 * side) {
+        pos.x = center.x + layer * spacing;
+        pos.y = center.y + (layer - (index - side)) * spacing;
+    } else if (index < 3 * side) {
+        pos.x = center.x + (layer - (index - 2 * side)) * spacing;
+        pos.y = center.y - layer * spacing;
+    } else {
+        pos.x = center.x - layer * spacing;
+        pos.y = center.y - (layer - (index - 3 * side)) * spacing;
+    }
+
+    return pos;
 }
 
 function removeAllClonesAsync() {
@@ -263,34 +272,6 @@ function removeAllClonesAsync() {
 
         resolve(); // Signale que la suppression est terminée
     });
-}
-
-function getNextPosition(count, spacing, center) {
-
-    if (count === 1) return center; // Premier clone au centre
-
-    let layer = Math.ceil((Math.sqrt(count) - 1) / 2); // Trouve l'anneau (carré) dans lequel placer le clone
-    let start = (2 * layer - 1) ** 2 + 1; // Première position de cet anneau
-    let index = count - start; // Position relative dans l'anneau
-
-    let side = 2 * layer; // Taille du côté de l'anneau
-    let pos = { x: center.x, y: center.y };
-
-    if (index < side) {
-        pos.x = center.x + (index - layer) * spacing;
-        pos.y = center.y + layer * spacing;
-    } else if (index < 2 * side) {
-        pos.x = center.x + layer * spacing;
-        pos.y = center.y + (layer - (index - side)) * spacing;
-    } else if (index < 3 * side) {
-        pos.x = center.x + (layer - (index - 2 * side)) * spacing;
-        pos.y = center.y - layer * spacing;
-    } else {
-        pos.x = center.x - layer * spacing;
-        pos.y = center.y - (layer - (index - 3 * side)) * spacing;
-    }
-
-    return pos;
 }
 
 function createUI() {
@@ -329,10 +310,40 @@ function createUI() {
     document.body.appendChild(nextButton);
 
     nextButton.addEventListener('click', next);
+
+    musicButton = document.createElement('button');
+    musicButton.innerText = 'Music';
+    musicButton.style.position = 'absolute';
+    musicButton.style.top = '10px';
+    musicButton.style.left = '500px';
+    musicButton.style.padding = '10px';
+    musicButton.style.fontSize = '16px';
+    document.body.appendChild(musicButton);
+
+    musicButton.addEventListener('click', musicClick);
+}
+
+function setupGUI() {
+    gui = new GUI();
+    guiParams = {
+        NombreEnnemis: Math.pow(nbrM, 2),
+        NombreRestants: nbrR,
+    };
+
+    gui.add(guiParams, 'NombreEnnemis').listen();
+    gui.add(guiParams, 'NombreRestants').listen();
+}
+
+function updateGUI() {
+    if (guiParams) {
+        guiParams.NombreEnnemis = Math.pow(nbrM, 2);
+        guiParams.NombreRestants = nbrR;
+    }
 }
 
 function addSoldier() {
     nbrR++;
+    updateGUI();
     loadGLTF(url, nbrR);
 }
 
@@ -366,8 +377,17 @@ function next() {
 
     removeAllClonesAsync().then(() => {
         nbrM++;
+        updateGUI();
         loadEnnemy(urlEnnemy, nbrM);
     });
+}
+
+function musicClick() {
+    if (music.paused) {
+        music.play();
+    } else {
+        music.pause();
+    }
 }
 
 function animate() {
@@ -403,7 +423,7 @@ function explode() {
             child.position.set(
                 (gridSize - 1) / 2 - x + explosionOffset.x,
                 explosionOffset.y,
-                (gridSize - 1) / 2 - y + explosionOffset.z
+                (gridSize - 1) / 2 - y + explosionOffset.z - nbrM - 5
             );
         });
     }
