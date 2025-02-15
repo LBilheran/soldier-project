@@ -5,13 +5,9 @@ import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 let camera, scene, renderer, controls;
-let mesh, mesh2, action, mixers;
-const min = 2;
-const max = 3;
-let amount = Math.floor(Math.random() * (max - 1 + 1) + min);
-let count = Math.pow(amount, 2);
-let amount2 = Math.floor(Math.random() * (max - 1 + 1) + min);
-let count2 = Math.pow(amount2, 2);
+let mesh, object, action, mixers;
+let nbrM = 1;
+let nbrS = 2;
 let separation;
 
 let explosionProgress = 0;
@@ -35,7 +31,7 @@ function init() {
 
     // Camera
     camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(amount * 0.9, amount * 0.9, amount * 0.9);
+    camera.position.set(nbrS * 0.9, nbrS * 0.9, nbrS * 0.9);
     camera.lookAt(0, 0, 0);
 
     // Renderer
@@ -100,56 +96,10 @@ function init() {
             scene.background = texture;
             scene.environment = texture;
 
-            // Promise.all([
-            //     loadGLTF('Michelle.glb', 0x2194ce, count),
-            //     // loadGeometry('suzanne_buffergeometry.json', 0x2194ce, count),
-            //     loadGeometry('suzanne_buffergeometry.json', 0x8d8d8d, count2)
-            // ]).then(([objectCreate, loadedMesh2]) => {
-            //     // if (mesh) {
-            //     //     scene.remove(mesh);
-            //     // }
-            //     // if (mesh2) {
-            //     //     scene.remove(mesh2);
-            //     // }
-            //     object = objectCreate;
-
-            //     mesh2 = loadedMesh2;
-
-            //     scene.add(object);
-            //     scene.add(mesh2);
-            //     // start();
-            // });
-            
-            const loader = new GLTFLoader();
-            loader.load('Michelle.glb', function (gltf) {
-
-                const instanceCount = 3;
-                mixers = []
-                
-                for (let i = 0; i < instanceCount; i++) {
-                    // Clone proprement le modèle avec les animations
-                    const clone = SkeletonUtils.clone(gltf.scene);
-                    scene.add(clone);
-            
-                    // Vérifie s'il y a bien des animations
-                    if (gltf.animations.length > 0) {
-                        const mixer = new THREE.AnimationMixer(clone);
-                        gltf.animations.forEach((clip) => {
-                            const action = mixer.clipAction(clip);
-                            action.play();
-                        });
-                        mixers.push(mixer);
-                    } else {
-                        console.warn('⚠️ Aucune animation trouvée dans Michelle.glb');
-                    }
-            
-                    // Positionner chaque clone
-                    const x = (i % 5) * 3 - 5;
-                    const z = Math.floor(i / 5) * 3 - 5;
-                    clone.position.set(x, 0, z);
-                }
+            loadGLTF('Michelle.glb', nbrM),
+            loadGeometry('suzanne_buffergeometry.json', 0x8d8d8d, nbrS)
+    
             });
-    });
 
     window.addEventListener('resize', onWindowResize);
 }
@@ -160,63 +110,76 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-function loadGeometry(url, color, counti) {
+function loadGeometry(url, color, count) {
+
+    if (mesh) {
+        scene.remove(mesh);
+    }
+
     const loader = new THREE.BufferGeometryLoader();
-    return new Promise((resolve) => {
-        loader.load(url, function (geometry) {
-            geometry.computeVertexNormals();
-            geometry.scale(0.5, 0.5, 0.5);
+    loader.load(url, function (geometry) {
+        geometry.computeVertexNormals();
+        geometry.scale(0.5, 0.5, 0.5);
 
-            const material = new THREE.MeshPhongMaterial({ color: color, shininess: 100 });
-            const instancedMesh = new THREE.InstancedMesh(geometry, material, counti);
-            instancedMesh.castShadow = true;
-			instancedMesh.receiveShadow = true;
-            instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        const material = new THREE.MeshPhongMaterial({ color: color, shininess: 100 });
+        mesh = new THREE.InstancedMesh(geometry, material, Math.pow(count,2));
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 
-            resolve(instancedMesh);
-        });
+        scene.add(mesh);
+
+        let i = 0;
+        const offset = (count - 1) / 2;
+        const maxAmount = Math.max(nbrM, count);
+        separation = maxAmount * 1.5;
+
+        const dummy = new THREE.Object3D();
+
+        for (let x = 0; x < count; x++) {
+            for (let y = 0; y < count; y++) {
+                dummy.position.set(offset - x, 0, -(offset - y) - separation);
+                dummy.updateMatrix();
+                mesh.setMatrixAt(i++, dummy.matrix);
+                console.log(i);
+            }
+        }
+        mesh.instanceMatrix.needsUpdate = true;
+        mesh.computeBoundingSphere();
     });
 }
 
-function loadGLTF(url, color, counti) {
+function loadGLTF(url, count) {
+    if (object) {
+        scene.remove(object);
+    }
+
     const loader = new GLTFLoader();
-    return new Promise((resolve) => {
-        loader.load(url, function ( gltf ) {
-            const objectCreate = new THREE.Group(); // On utilise un groupe pour contenir les instances
-            let material = new THREE.MeshPhongMaterial({ color: color, shininess: 100 });
+    loader.load('Michelle.glb', function (gltf) {
 
-            const dummy = new THREE.Object3D();
+        object = new THREE.Group();
+        mixers = []
+        
+        const offset = (count - 1) / 2;
+        for (let x = 0; x < count; x++) {
+            for (let y = 0; y < count; y++) {
 
-            gltf.scene.traverse(function (child) {
-                if (child.isMesh) {
-                    const geometry = child.geometry.clone(); // Clone pour éviter les conflits
-                    const instancedMesh = new THREE.InstancedMesh(geometry, material, counti);
-                    
-                    instancedMesh.castShadow = true;
-                    instancedMesh.receiveShadow = true;
-                    
-                    const offset = (amount - 1) / 2;
-                    let index = 0;
-                    for (let x = 0; x < amount; x++) {
-                        for (let y = 0; y < amount; y++) {
-                            if (index >= counti) break; // Arrête si on dépasse le nombre d'instances
+                // Clone proprement le modèle avec les animations
+                const clone = SkeletonUtils.clone(gltf.scene);
+                scene.add(clone);
 
-                            dummy.position.set(offset - x, 0, offset - y);
-                            dummy.updateMatrix();
-                            instancedMesh.setMatrixAt(index, dummy.matrix);
-                            index++;
-                        }
-                    }
+                const mixer = new THREE.AnimationMixer(clone);
+                const action = mixer.clipAction(gltf.animations[0]);
+                action.play();
+                mixers.push(mixer);
 
-                    instancedMesh.instanceMatrix.needsUpdate = true;
-                    objectCreate.add(instancedMesh); // Ajout de l'instance au groupe
-                }
-            });
-            mixer = new THREE.AnimationMixer(gltf.scene);
-            action = mixer.clipAction(gltf.animations[0]);
-            action.play();
-            resolve(objectCreate);
-        });
+                clone.position.set(offset - x, 0, offset - y);
+                clone.rotation.y = Math.PI;7
+
+                object.add(clone);
+            }
+        }
+        scene.add(object);
     });
 }
 
