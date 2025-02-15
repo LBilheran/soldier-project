@@ -5,18 +5,30 @@ import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 let camera, scene, renderer, controls;
-let mesh, object, mixers;
+
+let objectR = new THREE.Group();
+let mixersR = [];
+let objectM = new THREE.Group();
+let mixersM = [];
+
 let exploseButton, nextButton;
 
-let nbrM = 1;
-let nbrS = 2;
+let nbrR = 1;
+let nbrM = 2;
+
+let scaleFactor = 0.3;
+let gridSize, offset;
+let spacing = 1;
 let separation;
+
 let explosionProgress = 0;
 let explose = false;
 const explosionSpeed = 0.3;
 const explosionStrength = 5;
 const randomDirections = [];
 
+const url = 'RobotExpressive.glb';
+const urlEnnemy = 'Michelle.glb';
 const audio = new Audio('explode.wav');
 const clock = new THREE.Clock();
 
@@ -31,9 +43,12 @@ function init() {
 
     scene.fog = new THREE.Fog( 0x99DDFF, 5000, 10000 );
 
+    scene.add(objectR);
+    scene.add(objectM);
+
     // Camera
     camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-    camera.position.set(nbrS * 0.9, nbrS * 0.9, nbrS * 0.9);
+    camera.position.set(nbrM * 0.9, nbrM * 0.9, nbrM * 0.9);
     camera.lookAt(0, 0, 0);
 
     // Renderer
@@ -81,8 +96,8 @@ function init() {
     dirLight.shadow.bias = - 0.0001;
 
     const groundGeo = new THREE.PlaneGeometry( 10000, 10000 );
-    const groundMat = new THREE.MeshLambertMaterial( { color: 0xffffff } );
-    groundMat.color.setHSL( 0.095, 1, 0.75 );
+    const groundMat = new THREE.MeshLambertMaterial( { color: 0xAAA339 } );
+    groundMat.color.setHSL( 0.125, 0.70, 0.70 );
 
     const ground = new THREE.Mesh( groundGeo, groundMat );
     ground.position.y = 0;
@@ -98,8 +113,8 @@ function init() {
             scene.background = texture;
             scene.environment = texture;
 
-            loadGLTF('Michelle.glb', nbrM),
-            loadGeometry('suzanne_buffergeometry.json', 0x8d8d8d, nbrS)
+            loadGLTF(url, nbrR);
+            loadEnnemy(urlEnnemy, nbrM);
     
             });
 
@@ -107,100 +122,179 @@ function init() {
 }
 
 function onWindowResize() {
+
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-function loadGeometry(url, color, count) {
+function loadEnnemy(url, count) {
 
-    if (mesh) {
-        scene.remove(mesh);
-    }
+    // const loader = new THREE.BufferGeometryLoader();
+    // loader.load(url, function (geometry) {
+    //     geometry.computeVertexNormals();
+    //     geometry.scale(0.5, 0.5, 0.5);
 
-    const loader = new THREE.BufferGeometryLoader();
-    loader.load(url, function (geometry) {
-        geometry.computeVertexNormals();
-        geometry.scale(0.5, 0.5, 0.5);
+    //     const material = new THREE.MeshPhongMaterial({ color: color, shininess: 100 });
+    //     mesh = new THREE.InstancedMesh(geometry, material, Math.pow(count,2));
+    //     mesh.castShadow = true;
+    //     mesh.receiveShadow = true;
+    //     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
 
-        const material = new THREE.MeshPhongMaterial({ color: color, shininess: 100 });
-        mesh = new THREE.InstancedMesh(geometry, material, Math.pow(count,2));
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    //     scene.add(mesh);
 
-        scene.add(mesh);
+    //     let i = 0;
+    //     const offset = (count - 1) / 2;
 
-        let i = 0;
-        const offset = (count - 1) / 2;
+    //     const dummy = new THREE.Object3D();
 
-        const dummy = new THREE.Object3D();
-
-        for (let x = 0; x < count; x++) {
-            for (let y = 0; y < count; y++) {
-                dummy.position.set(offset - x, 1, -(offset - y) - nbrS - 1);
-                dummy.updateMatrix();
-                mesh.setMatrixAt(i++, dummy.matrix);
-            }
-        }
-        mesh.instanceMatrix.needsUpdate = true;
-        mesh.computeBoundingSphere();
-    });
-}
-
-function loadGLTF(url, count) {
-    if (object) {
-        scene.remove(object);
-    }
+    //     for (let x = 0; x < count; x++) {
+    //         for (let y = 0; y < count; y++) {
+    //             dummy.position.set(offset - x, 1, -(offset - y) - nbrM - 5);
+    //             dummy.updateMatrix();
+    //             mesh.setMatrixAt(i++, dummy.matrix);
+    //         }
+    //     }
+    //     mesh.instanceMatrix.needsUpdate = true;
+    //     mesh.computeBoundingSphere();
+    // });
 
     const loader = new GLTFLoader();
     loader.load(url, function (gltf) {
 
-        object = new THREE.Group();
-        mixers = []
-        
-        const gridSize = Math.ceil(Math.sqrt(count)); // Détermine la taille de la grille
-        const spacing = 1; // Distance entre les objets
-        const offset = (gridSize - 1) * spacing * 0.5; // Décale pour centrer
+        const offset = (count - 1) / 2;
 
-        for (let i = 0; i < count; i++) {
-            const x = i % gridSize;
-            const y = Math.floor(i / gridSize);
+        for (let x = 0; x < count; x++) {
+            for (let y = 0; y < count; y++) {
 
-            // Clone proprement le modèle avec les animations
-            const clone = SkeletonUtils.clone(gltf.scene);
-            scene.add(clone);
+                // Clone proprement le modèle avec les animations
+                const clone = SkeletonUtils.clone(gltf.scene);
+                scene.add(clone);
 
-            clone.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true; // Permet au clone de projeter une ombre
-                    child.receiveShadow = true; // Permet au clone de recevoir une ombre
-                }
-            });
+                clone.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true; // Permet au clone de projeter une ombre
+                        child.receiveShadow = true; // Permet au clone de recevoir une ombre
+                    }
+                });
+                
+                // Ajouter l'animation pour chaque clone
+                const mixer = new THREE.AnimationMixer(clone);
+                const action = mixer.clipAction(gltf.animations[0]);
+                action.play();
+                mixersM.push(mixer);
 
+                // Positionnement en grille centrée
+                clone.position.set(
+                    offset - x,  // Décale pour centrer la grille
+                    0,                     // Niveau du sol
+                    -(offset - y) - nbrM - 5  // Décale pour centrer la grille
+                );
 
-            // Ajouter l'animation pour chaque clone
-            const mixer = new THREE.AnimationMixer(clone);
-            const action = mixer.clipAction(gltf.animations[0]);
-            action.play();
-            mixers.push(mixer);
-
-            // Positionnement en grille centrée
-            clone.position.set(
-                x * spacing - offset,  // Décale pour centrer la grille
-                0,                     // Niveau du sol
-                y * spacing - offset   // Décale pour centrer la grille
-            );
-            clone.rotation.y = Math.PI; // Rotation si nécessaire
-
-            object.add(clone);
+                objectM.add(clone);
+            }
         }
-
-        scene.add(object);
     });
 }
 
+function loadGLTF(url, count) {
+
+    const loader = new GLTFLoader();
+    loader.load(url, function (gltf) {
+
+        const spacing = 1; // Distance entre les objets
+        const center = { x: 0, y: 0 }; // Centre du groupe
+
+        // Trouver la position du nouveau clone en respectant la logique de placement
+        const position = getNextPosition(count, spacing, center);
+
+        // Clone proprement le modèle avec les animations
+        const clone = SkeletonUtils.clone(gltf.scene);
+        scene.add(clone);
+
+        clone.traverse((child) => {
+            if (child.isMesh) {
+                child.castShadow = true; 
+                child.receiveShadow = true;
+            }
+        });
+
+        clone.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+        // Ajouter l'animation pour chaque clone
+        const mixer = new THREE.AnimationMixer(clone);
+        const action = mixer.clipAction(gltf.animations[2]);
+        action.play();
+        mixersR.push(mixer);
+
+        // ✅ Placer le clone à la bonne position sans toucher les autres
+        clone.position.set(position.x, 0, position.y);
+        clone.rotation.y = Math.PI;
+
+        objectR.add(clone);
+    });
+}
+
+function removeAllClonesAsync() {
+    return new Promise((resolve) => {
+        if (!objectM) {
+            resolve(); // Si le groupe est vide, on passe directement à la suite
+            return;
+        }
+
+        objectM.traverse((child) => {
+            if (child.isMesh) {
+                child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(mat => mat.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            }
+        });
+
+        while (objectM.children.length > 0) {
+            objectM.remove(objectM.children[0]);
+        }
+
+        mixersM= []; // Nettoyer les animations
+
+        resolve(); // Signale que la suppression est terminée
+    });
+}
+
+function getNextPosition(count, spacing, center) {
+
+    if (count === 1) return center; // Premier clone au centre
+
+    let layer = Math.ceil((Math.sqrt(count) - 1) / 2); // Trouve l'anneau (carré) dans lequel placer le clone
+    let start = (2 * layer - 1) ** 2 + 1; // Première position de cet anneau
+    let index = count - start; // Position relative dans l'anneau
+
+    let side = 2 * layer; // Taille du côté de l'anneau
+    let pos = { x: center.x, y: center.y };
+
+    if (index < side) {
+        pos.x = center.x + (index - layer) * spacing;
+        pos.y = center.y + layer * spacing;
+    } else if (index < 2 * side) {
+        pos.x = center.x + layer * spacing;
+        pos.y = center.y + (layer - (index - side)) * spacing;
+    } else if (index < 3 * side) {
+        pos.x = center.x + (layer - (index - 2 * side)) * spacing;
+        pos.y = center.y - layer * spacing;
+    } else {
+        pos.x = center.x - layer * spacing;
+        pos.y = center.y - (layer - (index - 3 * side)) * spacing;
+    }
+
+    return pos;
+}
+
 function createUI() {
+
     const addButton = document.createElement('button');
     addButton.innerText = 'Add';
     addButton.style.position = 'absolute';
@@ -238,13 +332,13 @@ function createUI() {
 }
 
 function addSoldier() {
-    nbrM++;
-    loadGLTF('Michelle.glb', nbrM);
+    nbrR++;
+    loadGLTF(url, nbrR);
 }
 
-function prepareExplosion(mesh) {
-    randomDirections.length = 0;
-    const count = Math.pow(nbrS, 2);
+function prepareExplosion() {
+
+    const count = Math.pow(nbrM, 2);
 
     for (let i = 0; i < count; i++) {
         randomDirections.push(new THREE.Vector3(
@@ -261,22 +355,29 @@ function prepareExplosion(mesh) {
 }
 
 function next() {
+
     nextButton.disabled = true;
     explose = false;
     explosionProgress = 0;
+    randomDirections.length = 0;
 
     audio.pause();
     audio.currentTime = 0;
 
-    nbrS++;
-    loadGeometry('suzanne_buffergeometry.json', 0x8d8d8d, nbrS);
+    removeAllClonesAsync().then(() => {
+        nbrM++;
+        loadEnnemy(urlEnnemy, nbrM);
+    });
 }
 
 function animate() {
-    const delta = clock.getDelta();
-    if (mixers) mixers.forEach(mixer => mixer.update(delta));
 
-    if (nbrM >= Math.pow(nbrS, 2) && !explose) exploseButton.disabled = false;
+    const delta = clock.getDelta();
+    if (mixersR) mixersR.forEach(mixer => mixer.update(delta));
+    if (mixersM) mixersM.forEach(mixer => mixer.update(delta));
+
+
+    if (nbrR >= Math.pow(nbrM, 2) && !explose) exploseButton.disabled = false;
 
     if (explose) {
         explode()
@@ -289,27 +390,22 @@ function animate() {
 function explode() {
     explosionProgress += explosionSpeed;
 
-    let i = 0;
-    if (randomDirections.length > 0 ) {
-        
-        const dummy = new THREE.Object3D();
+    if (randomDirections.length > 0) {
+        let gridSize = Math.ceil(Math.sqrt(objectM.children.length)); // Détermine la taille de la grille
 
-        for (let x = 0; x < nbrS; x++) {
-            for (let y = 0; y < nbrS; y++) {
-                let direction = randomDirections[i];
-                let explosionOffset = direction.clone().multiplyScalar(explosionProgress * explosionStrength);
-                
-                dummy.position.set(
-                    (nbrS - 1) / 2 - x + explosionOffset.x,
-                    explosionOffset.y,
-                    (nbrS - 1) / 2 - y + explosionOffset.z
-                );
-
-                dummy.updateMatrix();
-                mesh.setMatrixAt(i++, dummy.matrix);
-            }
-        }
-        mesh.instanceMatrix.needsUpdate = true;
+        objectM.children.forEach((child, i) => {
+            let x = i % gridSize; // Position colonne
+            let y = Math.floor(i / gridSize); // Position ligne
+            
+            let direction = randomDirections[i];
+            let explosionOffset = direction.clone().multiplyScalar(explosionProgress * explosionStrength);
+            
+            child.position.set(
+                (gridSize - 1) / 2 - x + explosionOffset.x,
+                explosionOffset.y,
+                (gridSize - 1) / 2 - y + explosionOffset.z
+            );
+        });
     }
 
     renderer.render(scene, camera);
