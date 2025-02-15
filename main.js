@@ -2,10 +2,12 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
-let camera, scene, renderer, object, mesh, mesh2, controls, mixer;
-const min = 8;
-const max = 32;
+let camera, scene, renderer, controls;
+let mesh, mesh2, action, mixers;
+const min = 2;
+const max = 3;
 let amount = Math.floor(Math.random() * (max - 1 + 1) + min);
 let count = Math.pow(amount, 2);
 let amount2 = Math.floor(Math.random() * (max - 1 + 1) + min);
@@ -18,6 +20,7 @@ const explosionSpeed = 0.1;
 const explosionStrength = 5;
 const randomDirections = [];
 const audio = new Audio('explode.wav');
+const clock = new THREE.Clock();
 
 init();
 createUI();
@@ -97,28 +100,58 @@ function init() {
             scene.background = texture;
             scene.environment = texture;
 
-            Promise.all([
-                loadGLTF('Michelle.glb', 0x2194ce, count),
-                // loadGeometry('suzanne_buffergeometry.json', 0x2194ce, count),
-                loadGeometry('suzanne_buffergeometry.json', 0x8d8d8d, count2)
-            ]).then(([{ objectCreate, loadedMesh }, loadedMesh2]) => {
-                if (mesh) {
-                    scene.remove(mesh);
-                }
-                if (mesh2) {
-                    scene.remove(mesh2);
-                }
-                object = objectCreate;
-                mesh = loadedMesh;
-                mesh2 = loadedMesh2;
+            // Promise.all([
+            //     loadGLTF('Michelle.glb', 0x2194ce, count),
+            //     // loadGeometry('suzanne_buffergeometry.json', 0x2194ce, count),
+            //     loadGeometry('suzanne_buffergeometry.json', 0x8d8d8d, count2)
+            // ]).then(([objectCreate, loadedMesh2]) => {
+            //     // if (mesh) {
+            //     //     scene.remove(mesh);
+            //     // }
+            //     // if (mesh2) {
+            //     //     scene.remove(mesh2);
+            //     // }
+            //     object = objectCreate;
 
-                scene.add(object);
-                scene.add(mesh2);
-                start();
+            //     mesh2 = loadedMesh2;
+
+            //     scene.add(object);
+            //     scene.add(mesh2);
+            //     // start();
+            // });
+            
+            const loader = new GLTFLoader();
+            loader.load('Michelle.glb', function (gltf) {
+
+                const instanceCount = 3;
+                mixers = []
+                
+                for (let i = 0; i < instanceCount; i++) {
+                    // Clone proprement le modèle avec les animations
+                    const clone = SkeletonUtils.clone(gltf.scene);
+                    scene.add(clone);
+            
+                    // Vérifie s'il y a bien des animations
+                    if (gltf.animations.length > 0) {
+                        const mixer = new THREE.AnimationMixer(clone);
+                        gltf.animations.forEach((clip) => {
+                            const action = mixer.clipAction(clip);
+                            action.play();
+                        });
+                        mixers.push(mixer);
+                    } else {
+                        console.warn('⚠️ Aucune animation trouvée dans Michelle.glb');
+                    }
+            
+                    // Positionner chaque clone
+                    const x = (i % 5) * 3 - 5;
+                    const z = Math.floor(i / 5) * 3 - 5;
+                    clone.position.set(x, 0, z);
+                }
             });
-
-            window.addEventListener('resize', onWindowResize);
     });
+
+    window.addEventListener('resize', onWindowResize);
 }
 
 function onWindowResize() {
@@ -149,97 +182,89 @@ function loadGLTF(url, color, counti) {
     const loader = new GLTFLoader();
     return new Promise((resolve) => {
         loader.load(url, function ( gltf ) {
-            const objectCreate = gltf.scene;
-
-            mixer = new THREE.AnimationMixer( objectCreate );
-            const action = mixer.clipAction( gltf.animations[ 0 ] );
-            action.play();
-
-            let instancedMesh = null;
-            let originalMesh = null;
-            let geometry = null;
+            const objectCreate = new THREE.Group(); // On utilise un groupe pour contenir les instances
             let material = new THREE.MeshPhongMaterial({ color: color, shininess: 100 });
 
             const dummy = new THREE.Object3D();
 
-            objectCreate.traverse( function ( child ) {
-                if ( child.isMesh ) {
-                    if (!originalMesh) {
-                        originalMesh = child;
-                        geometry = child.geometry;
+            gltf.scene.traverse(function (child) {
+                if (child.isMesh) {
+                    const geometry = child.geometry.clone(); // Clone pour éviter les conflits
+                    const instancedMesh = new THREE.InstancedMesh(geometry, material, counti);
+                    
+                    instancedMesh.castShadow = true;
+                    instancedMesh.receiveShadow = true;
+                    
+                    const offset = (amount - 1) / 2;
+                    let index = 0;
+                    for (let x = 0; x < amount; x++) {
+                        for (let y = 0; y < amount; y++) {
+                            if (index >= counti) break; // Arrête si on dépasse le nombre d'instances
+
+                            dummy.position.set(offset - x, 0, offset - y);
+                            dummy.updateMatrix();
+                            instancedMesh.setMatrixAt(index, dummy.matrix);
+                            index++;
+                        }
                     }
 
-                    child.material = material;
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-
-                    child.isInstancedMesh = true;
-                    child.instanceMatrix = new THREE.InstancedBufferAttribute( new Float32Array( instanceCount * 16 ), 16 );
-                    child.count = instanceCount;
-
-                    for ( let i = 0; i < instanceCount; i ++ ) {
-
-                        dummy.position.x = - 200 + ( ( i % 5 ) * 70 );
-                        dummy.position.y = Math.floor( i / 5 ) * - 200;
-
-                        dummy.updateMatrix();
-
-                        dummy.matrix.toArray( child.instanceMatrix.array, i * 16 );
-
-                    }
+                    instancedMesh.instanceMatrix.needsUpdate = true;
+                    objectCreate.add(instancedMesh); // Ajout de l'instance au groupe
                 }
             });
-            instancedMesh = new THREE.InstancedMesh(geometry, material, counti);
-            resolve({objectCreate, instancedMesh});
+            mixer = new THREE.AnimationMixer(gltf.scene);
+            action = mixer.clipAction(gltf.animations[0]);
+            action.play();
+            resolve(objectCreate);
         });
     });
 }
 
-function start() {
-    // if (mesh) {
-    //     let i = 0;
-    //     const offset = (amount - 1) / 2;
-    //     object.rotation.y = Math.PI;
+// function start() {
+//     if (mesh) {
+//         let i = 0;
+//         const offset = (amount - 1) / 2;
+//         object.rotation.y = Math.PI;
 
-    //     object.traverse( ( child ) => {
-    //         for (let x = 0; x < amount; x++) {
-    //             for (let y = 0; y < amount; y++) {
-    //                 dummy.position.set(offset - x, 0, offset - y);
-    //                 dummy.updateMatrix();
-    //                 dummy.matrix.toArray( child.instanceMatrix.array, i);
-    //                 mesh.setMatrixAt(i++, dummy.matrix);
-    //             }
-    //         }
-    //         mesh.instanceMatrix.needsUpdate = true;
-    //         mesh.computeBoundingSphere();
-    //         object.add(mesh);
-    //     });
-    // }
+//         object.traverse( ( child ) => {
+//             for (let x = 0; x < amount; x++) {
+//                 for (let y = 0; y < amount; y++) {
+//                     dummy.position.set(offset - x, 0, offset - y);
+//                     dummy.updateMatrix();
+//                     dummy.matrix.toArray( child.instanceMatrix.array, i);
+//                     mesh.setMatrixAt(i++, dummy.matrix);
+//                 }
+//             }
+//             mesh.instanceMatrix.needsUpdate = true;
+//             mesh.computeBoundingSphere();
+//             object.add(mesh);
+//         });
+//     }
 
-    if (mesh2) {
-        let i = 0;
-        const offset = (amount2 - 1) / 2;
-        const maxAmount = Math.max(amount, amount2);
-        separation = maxAmount * 1.5;
+//     if (mesh2) {
+//         let i = 0;
+//         const offset = (amount2 - 1) / 2;
+//         const maxAmount = Math.max(amount, amount2);
+//         separation = maxAmount * 1.5;
 
-        for (let x = 0; x < amount2; x++) {
-            for (let y = 0; y < amount2; y++) {
-                dummy.position.set(offset - x, 0, -(offset - y) - separation);
-                dummy.updateMatrix();
-                mesh2.setMatrixAt(i++, dummy.matrix);
-            }
-        }
-        mesh2.instanceMatrix.needsUpdate = true;
-        mesh2.computeBoundingSphere();
-    }
+//         for (let x = 0; x < amount2; x++) {
+//             for (let y = 0; y < amount2; y++) {
+//                 dummy.position.set(offset - x, 0, -(offset - y) - separation);
+//                 dummy.updateMatrix();
+//                 mesh2.setMatrixAt(i++, dummy.matrix);
+//             }
+//         }
+//         mesh2.instanceMatrix.needsUpdate = true;
+//         mesh2.computeBoundingSphere();
+//     }
 
-    if (count > count2) {
-        prepareExplosion(mesh2);
-    } else if (count2 > count) {
-        prepareExplosion(mesh);
-    }
+//     if (count > count2) {
+//         prepareExplosion(mesh2);
+//     } else if (count2 > count) {
+//         prepareExplosion(mesh);
+//     }
     
-}
+// }
 
 function updateInstances() {
     if (explose) {
@@ -267,7 +292,7 @@ function updateInstances() {
 
             scene.add(mesh);
             scene.add(mesh2);
-            start();
+            // start();
         });
     } else {
         explose = true;
@@ -290,10 +315,15 @@ function createUI() {
 }
 
 function animate() {
+    const delta = clock.getDelta(); // Calcul du temps écoulé depuis la dernière frame
+    if (mixers) mixers.forEach(mixer => mixer.update(delta));
+
     if (!explose) {
         renderer.render(scene, camera);
     } else {
-        explode();
+        // explode()
+        renderer.render(scene, camera);
+
     }
 }
 
