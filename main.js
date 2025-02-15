@@ -5,16 +5,18 @@ import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 let camera, scene, renderer, controls;
-let mesh, object, action, mixers;
+let mesh, object, mixers;
+let exploseButton, nextButton;
+
 let nbrM = 1;
 let nbrS = 2;
 let separation;
-
 let explosionProgress = 0;
 let explose = false;
-const explosionSpeed = 0.1;
+const explosionSpeed = 0.3;
 const explosionStrength = 5;
 const randomDirections = [];
+
 const audio = new Audio('explode.wav');
 const clock = new THREE.Clock();
 
@@ -83,7 +85,7 @@ function init() {
     groundMat.color.setHSL( 0.095, 1, 0.75 );
 
     const ground = new THREE.Mesh( groundGeo, groundMat );
-    ground.position.y = -2;
+    ground.position.y = 0;
     ground.rotation.x = - Math.PI / 2;
     ground.receiveShadow = true;
     scene.add( ground );
@@ -131,17 +133,14 @@ function loadGeometry(url, color, count) {
 
         let i = 0;
         const offset = (count - 1) / 2;
-        const maxAmount = Math.max(nbrM, count);
-        separation = maxAmount * 1.5;
 
         const dummy = new THREE.Object3D();
 
         for (let x = 0; x < count; x++) {
             for (let y = 0; y < count; y++) {
-                dummy.position.set(offset - x, 0, -(offset - y) - separation);
+                dummy.position.set(offset - x, 1, -(offset - y) - nbrS - 1);
                 dummy.updateMatrix();
                 mesh.setMatrixAt(i++, dummy.matrix);
-                console.log(i);
             }
         }
         mesh.instanceMatrix.needsUpdate = true;
@@ -155,144 +154,97 @@ function loadGLTF(url, count) {
     }
 
     const loader = new GLTFLoader();
-    loader.load('Michelle.glb', function (gltf) {
+    loader.load(url, function (gltf) {
 
         object = new THREE.Group();
         mixers = []
         
-        const offset = (count - 1) / 2;
-        for (let x = 0; x < count; x++) {
-            for (let y = 0; y < count; y++) {
+        const gridSize = Math.ceil(Math.sqrt(count)); // Détermine la taille de la grille
+        const spacing = 1; // Distance entre les objets
+        const offset = (gridSize - 1) * spacing * 0.5; // Décale pour centrer
 
-                // Clone proprement le modèle avec les animations
-                const clone = SkeletonUtils.clone(gltf.scene);
-                scene.add(clone);
+        for (let i = 0; i < count; i++) {
+            const x = i % gridSize;
+            const y = Math.floor(i / gridSize);
 
-                const mixer = new THREE.AnimationMixer(clone);
-                const action = mixer.clipAction(gltf.animations[0]);
-                action.play();
-                mixers.push(mixer);
+            // Clone proprement le modèle avec les animations
+            const clone = SkeletonUtils.clone(gltf.scene);
+            scene.add(clone);
 
-                clone.position.set(offset - x, 0, offset - y);
-                clone.rotation.y = Math.PI;7
+            clone.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true; // Permet au clone de projeter une ombre
+                    child.receiveShadow = true; // Permet au clone de recevoir une ombre
+                }
+            });
 
-                object.add(clone);
-            }
+
+            // Ajouter l'animation pour chaque clone
+            const mixer = new THREE.AnimationMixer(clone);
+            const action = mixer.clipAction(gltf.animations[0]);
+            action.play();
+            mixers.push(mixer);
+
+            // Positionnement en grille centrée
+            clone.position.set(
+                x * spacing - offset,  // Décale pour centrer la grille
+                0,                     // Niveau du sol
+                y * spacing - offset   // Décale pour centrer la grille
+            );
+            clone.rotation.y = Math.PI; // Rotation si nécessaire
+
+            object.add(clone);
         }
+
         scene.add(object);
     });
 }
 
-// function start() {
-//     if (mesh) {
-//         let i = 0;
-//         const offset = (amount - 1) / 2;
-//         object.rotation.y = Math.PI;
-
-//         object.traverse( ( child ) => {
-//             for (let x = 0; x < amount; x++) {
-//                 for (let y = 0; y < amount; y++) {
-//                     dummy.position.set(offset - x, 0, offset - y);
-//                     dummy.updateMatrix();
-//                     dummy.matrix.toArray( child.instanceMatrix.array, i);
-//                     mesh.setMatrixAt(i++, dummy.matrix);
-//                 }
-//             }
-//             mesh.instanceMatrix.needsUpdate = true;
-//             mesh.computeBoundingSphere();
-//             object.add(mesh);
-//         });
-//     }
-
-//     if (mesh2) {
-//         let i = 0;
-//         const offset = (amount2 - 1) / 2;
-//         const maxAmount = Math.max(amount, amount2);
-//         separation = maxAmount * 1.5;
-
-//         for (let x = 0; x < amount2; x++) {
-//             for (let y = 0; y < amount2; y++) {
-//                 dummy.position.set(offset - x, 0, -(offset - y) - separation);
-//                 dummy.updateMatrix();
-//                 mesh2.setMatrixAt(i++, dummy.matrix);
-//             }
-//         }
-//         mesh2.instanceMatrix.needsUpdate = true;
-//         mesh2.computeBoundingSphere();
-//     }
-
-//     if (count > count2) {
-//         prepareExplosion(mesh2);
-//     } else if (count2 > count) {
-//         prepareExplosion(mesh);
-//     }
-    
-// }
-
-function updateInstances() {
-    if (explose) {
-        explose = false;
-        explosionProgress = 0;
-        audio.pause();
-        audio.currentTime = 0;
-
-        amount = Math.floor(Math.random() * (max - min + 1) + min);
-        count = Math.pow(amount, 2);
-        amount2 = Math.floor(Math.random() * (max - min + 1) + min);
-        count2 = Math.pow(amount2, 2);
-        Promise.all([
-            loadGeometry('suzanne_buffergeometry.json', 0x2194ce, count),
-            loadGeometry('suzanne_buffergeometry.json', 0x8d8d8d, count2)
-        ]).then(([loadedMesh, loadedMesh2]) => {
-            if (mesh) {
-                scene.remove(mesh);
-            }
-            if (mesh2) {
-                scene.remove(mesh2);
-            }
-            mesh = loadedMesh;
-            mesh2 = loadedMesh2;
-
-            scene.add(mesh);
-            scene.add(mesh2);
-            // start();
-        });
-    } else {
-        explose = true;
-        audio.play();
-    }
-    
-}
-
 function createUI() {
-    const button = document.createElement('button');
-    button.innerText = 'Explose/Random';
-    button.style.position = 'absolute';
-    button.style.top = '10px';
-    button.style.left = '10px';
-    button.style.padding = '10px';
-    button.style.fontSize = '16px';
-    document.body.appendChild(button);
+    const addButton = document.createElement('button');
+    addButton.innerText = 'Add';
+    addButton.style.position = 'absolute';
+    addButton.style.top = '10px';
+    addButton.style.left = '10px';
+    addButton.style.padding = '10px';
+    addButton.style.fontSize = '16px';
+    document.body.appendChild(addButton);
 
-    button.addEventListener('click', updateInstances);
+    addButton.addEventListener('click', addSoldier);
+
+    exploseButton = document.createElement('button');
+    exploseButton.innerText = 'Explose';
+    exploseButton.style.position = 'absolute';
+    exploseButton.style.top = '10px';
+    exploseButton.style.left = '70px';
+    exploseButton.style.padding = '10px';
+    exploseButton.style.fontSize = '16px';
+    exploseButton.disabled = true;
+    document.body.appendChild(exploseButton);
+
+    exploseButton.addEventListener('click', prepareExplosion);
+
+    nextButton = document.createElement('button');
+    nextButton.innerText = 'Next';
+    nextButton.style.position = 'absolute';
+    nextButton.style.top = '10px';
+    nextButton.style.left = '160px';
+    nextButton.style.padding = '10px';
+    nextButton.style.fontSize = '16px';
+    nextButton.disabled = true;
+    document.body.appendChild(nextButton);
+
+    nextButton.addEventListener('click', next);
 }
 
-function animate() {
-    const delta = clock.getDelta(); // Calcul du temps écoulé depuis la dernière frame
-    if (mixers) mixers.forEach(mixer => mixer.update(delta));
-
-    if (!explose) {
-        renderer.render(scene, camera);
-    } else {
-        // explode()
-        renderer.render(scene, camera);
-
-    }
+function addSoldier() {
+    nbrM++;
+    loadGLTF('Michelle.glb', nbrM);
 }
 
 function prepareExplosion(mesh) {
-    const count = mesh.count;
     randomDirections.length = 0;
+    const count = Math.pow(nbrS, 2);
 
     for (let i = 0; i < count; i++) {
         randomDirections.push(new THREE.Vector3(
@@ -301,43 +253,56 @@ function prepareExplosion(mesh) {
             (Math.random() - 0.5) * 2
         ).normalize());
     }
+
+    explose = true;
+    nextButton.disabled = false;
+    exploseButton.disabled = true;
+    audio.play();
+}
+
+function next() {
+    nextButton.disabled = true;
+    explose = false;
+    explosionProgress = 0;
+
+    audio.pause();
+    audio.currentTime = 0;
+
+    nbrS++;
+    loadGeometry('suzanne_buffergeometry.json', 0x8d8d8d, nbrS);
+}
+
+function animate() {
+    const delta = clock.getDelta();
+    if (mixers) mixers.forEach(mixer => mixer.update(delta));
+
+    if (nbrM >= Math.pow(nbrS, 2) && !explose) exploseButton.disabled = false;
+
+    if (explose) {
+        explode()
+    }
+
+    renderer.render(scene, camera);
+
 }
 
 function explode() {
-    if (count > count2 && mesh2) {
-        explosionProgress += explosionSpeed;
+    explosionProgress += explosionSpeed;
 
-        let i = 0;
-        for (let x = 0; x < amount2; x++) {
-            for (let y = 0; y < amount2; y++) {
+    let i = 0;
+    if (randomDirections.length > 0 ) {
+        
+        const dummy = new THREE.Object3D();
+
+        for (let x = 0; x < nbrS; x++) {
+            for (let y = 0; y < nbrS; y++) {
                 let direction = randomDirections[i];
                 let explosionOffset = direction.clone().multiplyScalar(explosionProgress * explosionStrength);
                 
                 dummy.position.set(
-                    (amount2 - 1) / 2 - x + explosionOffset.x,
+                    (nbrS - 1) / 2 - x + explosionOffset.x,
                     explosionOffset.y,
-                    (amount2 - 1) / 2 - y -separation + explosionOffset.z
-                );
-
-                dummy.updateMatrix();
-                mesh2.setMatrixAt(i++, dummy.matrix);
-            }
-        }
-        mesh2.instanceMatrix.needsUpdate = true;
-    } 
-    else if (count2 > count && mesh) {
-        explosionProgress += explosionSpeed;
-
-        let i = 0;
-        for (let x = 0; x < amount; x++) {
-            for (let y = 0; y < amount; y++) {
-                let direction = randomDirections[i];
-                let explosionOffset = direction.clone().multiplyScalar(explosionProgress * explosionStrength);
-                
-                dummy.position.set(
-                    (amount - 1) / 2 - x + explosionOffset.x,
-                    explosionOffset.y,
-                    (amount - 1) / 2 - y + explosionOffset.z
+                    (nbrS - 1) / 2 - y + explosionOffset.z
                 );
 
                 dummy.updateMatrix();
