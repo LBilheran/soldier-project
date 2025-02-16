@@ -1,8 +1,13 @@
-import { defineConfig } from 'vite';
+const isCodeSandbox = !!process.env.SANDBOX_URL
 
-export default defineConfig({
+export default {
+  root: "src/",
+  publicDir: "../public/",
   base: '/soldier-project/',
-  build: {
-    outDir: 'dist',
-  }
-});
+  build:
+    {
+        outDir: "dist",
+        emptyOutDir: true,
+        sourcemap: true
+    }
+};
