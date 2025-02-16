@@ -1,6 +1,6 @@
 {
     "name": "SoldierProject",
-    "start_url": "./",
+    "start_url": "./index.html",
     "icons": [
       {
         "src": "images/fond_ecran.png",
