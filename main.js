@@ -1,9 +1,9 @@
-import * as THREE from './node_modules/three';
-import { OrbitControls } from './node_modules/three/examples/jsm/controls/OrbitControls.js';
-import { GLTFLoader } from './node_modules/three/addons/loaders/GLTFLoader.js';
-import { RGBELoader } from './node_modules/three/addons/loaders/RGBELoader.js';
-import * as SkeletonUtils from './node_modules/three/examples/jsm/utils/SkeletonUtils.js';
-import GUI from './node_modules/lil-gui';
+import * as THREE from './node_modules/three/build/three.module.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import GUI from 'lil-gui';
 
 let gui, guiParams;
 
