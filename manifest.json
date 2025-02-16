@@ -1,0 +1,12 @@
+{
+    "name": "SoldierProject",
+    "start_url": "./",
+    "icons": [
+      {
+        "src": "images/fond_ecran.png",
+        "sizes": "144x144",
+        "type": "image/png"
+      }
+    ],
+    "display": "fullscreen"
+  }
