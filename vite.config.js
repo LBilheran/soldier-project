@@ -4,6 +4,11 @@ export default {
   root: "src/",
   publicDir: "../public/",
   base: '/soldier-project/',
+  server:
+    {
+        host: true,
+        open: !isCodeSandbox // Open if it's not a CodeSandbox
+    },
   build:
     {
         outDir: "dist",
