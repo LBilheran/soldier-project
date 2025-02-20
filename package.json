@@ -1,9 +1,9 @@
 {
   "name": "soldier-project",
-  "private": true,
+  "author": "LBilheran",
+  "license": "MIT",
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://lbilheran.github.io/soldier-project/",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
