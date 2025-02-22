@@ -16,7 +16,7 @@ Features:
 
 Results: https://lbilheran.github.io/soldier-project/
 
-![Alt text](./soldier-project_view.png?raw=true "Result")
+![Alt text](./images/soldier-project_view.png?raw=true "Result")
 
 ## Local installation
 
