@@ -7,14 +7,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "deploy": "gh-pages -d dist"
+    "preview": "vite preview"
   },
   "devDependencies": {
     "vite": "^6.1.0"
   },
   "dependencies": {
-    "gh-pages": "^6.3.0",
     "lil-gui": "^0.20.0",
     "three": "^0.173.0"
   }
