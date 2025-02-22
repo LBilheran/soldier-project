@@ -16,6 +16,8 @@ Features:
 
 Results: https://lbilheran.github.io/soldier-project/
 
+![Alt text](./soldier-project_view.png?raw=true "Result")
+
 ## Local installation
 
 First, clone this repository locally.
@@ -42,4 +44,4 @@ npm run dev
     - Lights and Shadows: https://threejs.org/examples/?q=light#webgl_lights_hemisphere
     - Background (RGBE): https://threejs.org/examples/#webgl_materials_cubemap_dynamic
 
-- Musique: Age of War (jeux vidéos)
+- Musique: Age of War (Video Game)

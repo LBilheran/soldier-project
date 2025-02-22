@@ -21,9 +21,6 @@ let nbrR = 1;
 let nbrM = 2;
 
 let scaleFactor = 0.3;
-let gridSize, offset;
-let spacing = 1;
-let separation;
 
 let explosionProgress = 0;
 let explose = false;
@@ -45,7 +42,7 @@ setupGUI();
 
 function init() {
 
-    // Scène
+    // Scene
     scene = new THREE.Scene();
     scene.background = new THREE.Color( 0x99DDFF );
 
@@ -75,7 +72,7 @@ function init() {
     controls.target.set(0, 2, 0);
     controls.update();
 
-    // Lumières
+    // Lights
     const hemiLight = new THREE.HemisphereLight( 0xffffff, 0xffffff, 2 );
     hemiLight.color.setHSL( 0.6, 1, 0.6 );
     hemiLight.groundColor.setHSL( 0.095, 1, 0.75 );
@@ -146,28 +143,26 @@ function loadEnnemy(url, count) {
         for (let x = 0; x < count; x++) {
             for (let y = 0; y < count; y++) {
 
-                // Clone proprement le modèle avec les animations
+                // Clone with animations
                 const clone = SkeletonUtils.clone(gltf.scene);
                 scene.add(clone);
 
                 clone.traverse((child) => {
                     if (child.isMesh) {
-                        child.castShadow = true; // Permet au clone de projeter une ombre
-                        child.receiveShadow = true; // Permet au clone de recevoir une ombre
+                        child.castShadow = true;
+                        child.receiveShadow = true;
                     }
                 });
                 
-                // Ajouter l'animation pour chaque clone
                 const mixer = new THREE.AnimationMixer(clone);
                 const action = mixer.clipAction(gltf.animations[0]);
                 action.play();
                 mixersM.push(mixer);
 
-                // Positionnement en grille centrée
                 clone.position.set(
-                    offset - x,  // Décale pour centrer la grille
-                    0,                     // Niveau du sol
-                    -(offset - y) - nbrM - 5  // Décale pour centrer la grille
+                    offset - x, 
+                    0,
+                    -(offset - y) - nbrM - 5
                 );
 
                 objectM.add(clone);
@@ -181,13 +176,11 @@ function loadGLTF(url, count) {
     const loader = new GLTFLoader();
     loader.load(url, function (gltf) {
 
-        const spacing = 1; // Distance entre les objets
-        const center = { x: 0, y: 0 }; // Centre du groupe
+        const spacing = 1;
+        const center = { x: 0, y: 0 }; // Centre
 
-        // Trouver la position du nouveau clone en respectant la logique de placement
         const position = getNextPosition(count, spacing, center);
 
-        // Clone proprement le modèle avec les animations
         const clone = SkeletonUtils.clone(gltf.scene);
         scene.add(clone);
 
@@ -200,7 +193,7 @@ function loadGLTF(url, count) {
 
         clone.scale.set(scaleFactor, scaleFactor, scaleFactor);
 
-        // Ajouter l'animation pour chaque clone
+        // Random animation
         const array = [0, 2, 3, 4, 5, 9, 11, 12, 13];
         const animation = array[Math.floor(Math.random() * array.length)];
 
@@ -209,7 +202,6 @@ function loadGLTF(url, count) {
         action.play();
         mixersR.push(mixer);
 
-        // ✅ Placer le clone à la bonne position sans toucher les autres
         clone.position.set(position.x, 0, position.y);
         clone.rotation.y = Math.PI;
 
@@ -217,15 +209,16 @@ function loadGLTF(url, count) {
     });
 }
 
+// Find the next position of the clone (around the first robot)
 function getNextPosition(count, spacing, center) {
 
-    if (count === 1) return center; // Premier clone au centre
+    if (count === 1) return center; // First on centre
 
-    let layer = Math.ceil((Math.sqrt(count) - 1) / 2); // Trouve l'anneau (carré) dans lequel placer le clone
-    let start = (2 * layer - 1) ** 2 + 1; // Première position de cet anneau
-    let index = count - start; // Position relative dans l'anneau
+    let layer = Math.ceil((Math.sqrt(count) - 1) / 2);
+    let start = (2 * layer - 1) ** 2 + 1;
+    let index = count - start;
 
-    let side = 2 * layer; // Taille du côté de l'anneau
+    let side = 2 * layer;
     let pos = { x: center.x, y: center.y };
 
     if (index < side) {
@@ -248,7 +241,7 @@ function getNextPosition(count, spacing, center) {
 function removeAllClonesAsync() {
     return new Promise((resolve) => {
         if (!objectM) {
-            resolve(); // Si le groupe est vide, on passe directement à la suite
+            resolve();
             return;
         }
 
@@ -269,9 +262,9 @@ function removeAllClonesAsync() {
             objectM.remove(objectM.children[0]);
         }
 
-        mixersM= []; // Nettoyer les animations
+        mixersM= [];
 
-        resolve(); // Signale que la suppression est terminée
+        resolve();
     });
 }
 
@@ -327,18 +320,18 @@ function createUI() {
 function setupGUI() {
     gui = new GUI();
     guiParams = {
-        NombreEnnemis: Math.pow(nbrM, 2),
-        NombreRestants: nbrR,
+        Michelle: Math.pow(nbrM, 2),
+        Robot: nbrR,
     };
 
-    gui.add(guiParams, 'NombreEnnemis').listen();
-    gui.add(guiParams, 'NombreRestants').listen();
+    gui.add(guiParams, 'Michelle').listen();
+    gui.add(guiParams, 'Robot').listen();
 }
 
 function updateGUI() {
     if (guiParams) {
-        guiParams.NombreEnnemis = Math.pow(nbrM, 2);
-        guiParams.NombreRestants = nbrR;
+        guiParams.Michelle = Math.pow(nbrM, 2);
+        guiParams.Robot = nbrR;
     }
 }
 
@@ -412,11 +405,11 @@ function explode() {
     explosionProgress += explosionSpeed;
 
     if (randomDirections.length > 0) {
-        let gridSize = Math.ceil(Math.sqrt(objectM.children.length)); // Détermine la taille de la grille
+        let gridSize = Math.ceil(Math.sqrt(objectM.children.length));
 
         objectM.children.forEach((child, i) => {
-            let x = i % gridSize; // Position colonne
-            let y = Math.floor(i / gridSize); // Position ligne
+            let x = i % gridSize;
+            let y = Math.floor(i / gridSize);
             
             let direction = randomDirections[i];
             let explosionOffset = direction.clone().multiplyScalar(explosionProgress * explosionStrength);
