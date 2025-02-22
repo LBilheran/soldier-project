@@ -12,11 +12,22 @@ Features:
 - Background (RGBE)
 - GUI
 
+The game is downloadable on phone!
+
 ## Live Demo
 
 Results: https://lbilheran.github.io/soldier-project/
 
 ![Alt text](./public/images/soldier-project_view.png?raw=true "Result")
+
+## Phone installation
+
+- Go to https://lbilheran.github.io/soldier-project/ on your phone (Chrome is the best option, maybe it doesn't work on other browsers).
+- Click on the three dots and click on "Add to home screen".
+- Click "Install" to play offline ! Or, create a shorcut to go to the site faster.
+
+/!\ If you play the game on the website, maybe you will have to delete the cache before install the app.
+
 
 ## Local installation
 
@@ -37,7 +48,7 @@ npm run dev
 
 ## Sources
 
-- Exemples ThreeJS:
+- Three JS examples:
     - Robot, animation and GUI: https://threejs.org/examples/#webgl_animation_skinning_morph
     - Michelle and instancing: https://threejs.org/examples/?q=inst#webgpu_skinning_instancing
     - JSON and instancing: https://threejs.org/examples/?q=inst#webgpu_instance_mesh
@@ -45,3 +56,8 @@ npm run dev
     - Background (RGBE): https://threejs.org/examples/#webgl_materials_cubemap_dynamic
 
 - Musique: Age of War (Video Game)
+
+## Thanks
+
+I would like to thank my teacher, Fivos Doganis, for this course and this WEB 3D project.
+Thanks for all the people who created the Three JS examples and models.
