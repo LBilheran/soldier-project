@@ -1,23 +1,40 @@
 # Soldier Project
 
-Instanciation de modèle GLTF/GLB.
+Results : https://lbilheran.github.io/soldier-project/
 
-## Installation
+Robot VS Michelle:
+Add Robots to have a larger group than Michelle's (dancer) group, and blow up your opponent to move to the next size!
+You can turn on music to enjoy the game more!
 
-- Installer les packages :
+Project main objective: GLTF/GLB model instancing.
+
+Features:
+- Lights and Shadows
+- Controls
+- Background (RGBE)
+- GUI
+
+## Local installation
+
+- Install packages :
 ```bash
 npm install
 ```
 
-- Démarrrer le jeu sur un port de la machine :
+- Load the game locally :
 ```bash
 npm run dev
 ```
 
-- Puis ouvrez un naviateur vers cette adresse : http://localhost:5173/soldier-projet/
+- Open the following address on a browser (Firefox for example) : http://localhost:5173/soldier-projet/
 
 ## Sources
 
-- Model ThreeJS :
+- Exemples ThreeJS :
+    - Robot, animation and GUI : https://threejs.org/examples/#webgl_animation_skinning_morph
+    - Michelle and instancing : https://threejs.org/examples/?q=inst#webgpu_skinning_instancing
+    - JSON and instancing : https://threejs.org/examples/?q=inst#webgpu_instance_mesh
+    - Lights and Shadows : https://threejs.org/examples/?q=light#webgl_lights_hemisphere
+    - Background (RGBE) : https://threejs.org/examples/#webgl_materials_cubemap_dynamic
 
-- Music : Age of War
+- Musique : Age of War (jeux vidéos)
