@@ -17,7 +17,7 @@ export default {
         display: "standalone",
         icons: [
           {
-            src: "../images/robot-144.png",
+            src: "images/robot-144.png",
             sizes: "144x144",
             type: "image/png",
           },
