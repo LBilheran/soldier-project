@@ -312,8 +312,8 @@ function createUI() {
     musicButton = document.createElement('button');
     musicButton.innerText = 'Music';
     musicButton.style.position = 'absolute';
-    musicButton.style.top = '10px';
-    musicButton.style.left = '500px';
+    musicButton.style.top = '70px';
+    musicButton.style.left = '10px';
     musicButton.style.padding = '10px';
     musicButton.style.fontSize = '16px';
     document.body.appendChild(musicButton);
