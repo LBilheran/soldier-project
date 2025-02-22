@@ -85,6 +85,7 @@ function init() {
     dirLight.position.multiplyScalar( 30 );
     scene.add( dirLight );
 
+    // Shadows
     dirLight.castShadow = true;
 
     dirLight.shadow.mapSize.width = 2048;
@@ -100,6 +101,7 @@ function init() {
     dirLight.shadow.camera.far = 3500;
     dirLight.shadow.bias = - 0.0001;
 
+    // Ground
     const groundGeo = new THREE.PlaneGeometry( 10000, 10000 );
     const groundMat = new THREE.MeshLambertMaterial( { color: 0xAAA339 } );
     groundMat.color.setHSL( 0.125, 0.70, 0.70 );
@@ -159,6 +161,7 @@ function loadEnnemy(url, count) {
                 action.play();
                 mixersM.push(mixer);
 
+                // Square grid
                 clone.position.set(
                     offset - x, 
                     0,
@@ -179,6 +182,7 @@ function loadGLTF(url, count) {
         const spacing = 1;
         const center = { x: 0, y: 0 }; // Centre
 
+        // Square grid
         const position = getNextPosition(count, spacing, center);
 
         const clone = SkeletonUtils.clone(gltf.scene);
